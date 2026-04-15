@@ -9,68 +9,39 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-body { font-family: system-ui; background: linear-gradient(135deg,#c084fc,#f472b6); margin:0; padding:24px; min-height: 100vh; }
-h1 { text-align:center; color:#fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
-.grid { max-width:520px; margin:0 auto; display:grid; gap:12px; }
-.card { background:#fff; border-radius:14px; padding:16px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-button { padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-weight: bold; transition:all .35s ease; }
+body { font-family: system-ui; background: linear-gradient(135deg,#c084fc,#f472b6); margin:0; padding:24px; min-height:100vh; }
+h1 { text-align:center; color:#fff; }
+.grid { max-width:520px; margin:auto; display:grid; gap:12px; }
+.card { background:#fff; border-radius:14px; padding:16px; display:flex; justify-content:space-between; align-items:center; }
+button { padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-weight:bold; }
 .pick { background:#8b5cf6; color:#fff; }
-.picked { background:#22c55e; color:#fff; transform: scale(1.05); }
+.picked { background:#22c55e; color:#fff; }
 .hidden { display:none; }
 .locked { pointer-events:none; opacity:.6; }
-.status { text-align:center; color:#fff; margin-bottom:12px; font-weight:bold; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 50px; }
+.status { text-align:center; color:#fff; margin-bottom:12px; font-weight:bold; background:rgba(0,0,0,.2); padding:8px; border-radius:50px; }
 
-/* SUBMIT BUTTON */
-.submit { position:relative; width:100%; margin-top:16px; font-size:18px; background:#ec4899; color:#fff; overflow:hidden; height: 50px; }
-.submit .btn-text { transition:opacity .25s ease, transform .25s ease; }
+.submit { width:100%; margin-top:12px; font-size:18px; background:#ec4899; color:#fff; height:50px; position:relative; }
+.submit.success { background:#22c55e; }
 .checkmark { position:absolute; inset:0; display:grid; place-items:center; opacity:0; }
-.checkmark svg { width:30px; height:30px; stroke:#fff; stroke-width:4; fill:none; stroke-dasharray:48; stroke-dashoffset:48; }
-.submit.success { background:#22c55e !important; }
-.submit.success .btn-text { opacity:0; transform:scale(.4); }
 .submit.success .checkmark { opacity:1; }
-.submit.success .checkmark svg { animation:drawCheck .45s ease forwards .1s; }
-@keyframes drawCheck { to { stroke-dashoffset:0 } }
-
-/* ADMIN UI */
-.admin-btn { margin: 40px auto; display: block; opacity:.5; background:#000; color:#fff; font-size: 11px; }
-#adminBox { background: white; padding: 20px; border-radius: 20px; max-width: 500px; margin: 0 auto; }
-.bar-bg { background:#eee; height:16px; border-radius:10px; overflow:hidden; margin-bottom: 12px; }
-.bar { height:100%; background:linear-gradient(90deg,#ec4899,#8b5cf6); transition: width 0.5s ease; }
 </style>
 </head>
 
 <body>
-
 <h1>🎤 Xếp hạng tiết mục yêu thích</h1>
-<div id="status" class="status">Đang kết nối...</div>
+<div id="status" class="status">Chọn thứ tự yêu thích từ 1 đến 5</div>
 
 <div id="voteBox" class="grid"></div>
 
+<button id="resetBtn" class="submit" style="background:#64748b">♻️ ĐỔI Ý / CHỌN LẠI</button>
+
 <button id="submitBtn" class="submit hidden">
   <span class="btn-text">GỬI BÌNH CHỌN</span>
-  <span class="checkmark">
-    <svg viewBox="0 0 52 52"><path d="M14 27 L22 35 L38 18"/></svg>
-  </span>
+  <span class="checkmark">✔</span>
 </button>
 
-<button class="admin-btn" onclick="openAdmin()">BTC / MC</button>
-
-<div id="adminBox" class="hidden">
-  <h2 style="text-align:center">📊 QUẢN TRỊ BTC</h2>
-  <input type="password" id="adminPass" placeholder="Mật khẩu" style="width:100%; padding:10px; margin-bottom:10px" />
-  <button onclick="login()" style="width:100%; background:#000; color:#fff">ĐĂNG NHẬP</button>
-
-  <div id="adminPanel" class="hidden">
-    <div style="display:flex; gap:10px; margin-bottom:15px">
-        <button onclick="openVote()" style="flex:1; background:#22c55e; color:#fff">MỞ VOTE</button>
-        <button onclick="closeVote()" style="flex:1; background:#ef4444; color:#fff">ĐÓNG VOTE</button>
-    </div>
-    <div id="results"></div>
-  </div>
-</div>
-
+<!-- ================= FIREBASE ================= -->
 <script>
-// ================= 1. FIREBASE CONFIG (BẮT BUỘC THAY THẾ) =================
 firebase.initializeApp({
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -78,10 +49,7 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
-// ================= 2. CẤU HÌNH HỆ THỐNG =================
-const ADMIN_PASSWORD = "77779999";
 const votedKey = "talent_voted_2026";
-const CONFIG_DOC = db.collection("votes").doc("config");
 const SCORE_DOC = db.collection("votes").doc("scores");
 
 const TALENTS = [
@@ -92,125 +60,84 @@ const TALENTS = [
   { id:"t5", name:"Say Tình" },
 ];
 
-const points = [5, 4, 3, 2, 1];
+const points = [5,4,3,2,1];
 let ranking = [];
-let isVoteOpen = true;
 
 const voteBox = document.getElementById("voteBox");
 const submitBtn = document.getElementById("submitBtn");
+const resetBtn = document.getElementById("resetBtn");
 const statusText = document.getElementById("status");
 
-// ================= 3. LOGIC KHÁN GIẢ =================
-
+/* ===== INIT ===== */
 if (localStorage.getItem(votedKey)) {
   statusText.innerText = "✅ Bạn đã bình chọn thành công!";
   voteBox.classList.add("locked");
+  submitBtn.classList.add("hidden");
+  resetBtn.classList.add("hidden");
 }
 
-CONFIG_DOC.onSnapshot(doc => {
-  if(!doc.exists) return;
-  isVoteOpen = doc.data().isOpen;
-  if (!localStorage.getItem(votedKey)) {
-    statusText.innerText = isVoteOpen ? "🟢 ĐANG MỞ VOTE" : "🔴 ĐÃ ĐÓNG VOTE";
-  }
-  if(!isVoteOpen) submitBtn.classList.add("hidden");
-});
-
+/* ===== TẠO DANH SÁCH ===== */
 TALENTS.forEach(t => {
-  const c = document.createElement("div");
-  c.className = "card";
-  c.innerHTML = `<span>${t.name}</span>`;
-  const b = document.createElement("button");
-  b.className = "pick";
-  b.innerText = "Chọn";
-  b.onclick = () => {
-    if(!isVoteOpen || ranking.includes(t.id) || localStorage.getItem(votedKey)) return;
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `<span>${t.name}</span>`;
+  const btn = document.createElement("button");
+  btn.className = "pick";
+  btn.innerText = "Chọn";
+  btn.onclick = () => {
+    if (ranking.includes(t.id) || localStorage.getItem(votedKey)) return;
     ranking.push(t.id);
-    b.innerText = "#" + ranking.length;
-    b.className = "picked";
-    if(ranking.length === TALENTS.length) submitBtn.classList.remove("hidden");
+    btn.innerText = "#" + ranking.length;
+    btn.className = "picked";
+    if (ranking.length === TALENTS.length) submitBtn.classList.remove("hidden");
   };
-  c.appendChild(b);
-  voteBox.appendChild(c);
+  card.appendChild(btn);
+  voteBox.appendChild(card);
 });
 
-// ================= 4. ĐỒNG BỘ DỮ LIỆU SANG FIREBASE & GOOGLE FORMS =================
-submitBtn.onclick = async () => {
+/* ===== RESET ===== */
+resetBtn.onclick = () => {
   if (localStorage.getItem(votedKey)) return;
-
-  submitBtn.disabled = true;
-  voteBox.classList.add("locked");
-  submitBtn.classList.add("success");
-
-  // A. Chuẩn bị dữ liệu Firebase (Cộng điểm)
-  const firebaseData = {};
-  ranking.forEach((id, idx) => {
-    firebaseData[id] = firebase.firestore.FieldValue.increment(points[idx]);
+  ranking = [];
+  document.querySelectorAll(".card button").forEach(b => {
+    b.innerText = "Chọn";
+    b.className = "pick";
   });
-
-  // B. Chuẩn bị dữ liệu Google Forms (Đồng bộ thứ tự tên)
-  // Link của bạn đã được chuyển sang /formResponse
-  const formURL = "https://docs.google.com/forms/d/e/1FAIpQLSc_yb1JeEIsCCYrICFRcC6wAEiE1sNPgyg5oQnWfV_bRmA8Qg/formResponse";
-  const formData = new FormData();
-  const getName = (id) => TALENTS.find(t => t.id === id).name;
-
-  // Cập nhật Entry ID mới dựa trên link "Mẫu điền sẵn" bạn cung cấp
-  formData.append("entry.1645167770", getName(ranking[0])); // Hạng 1
-  formData.append("entry.16326487", getName(ranking[1]));   // Hạng 2
-  formData.append("entry.393003367", getName(ranking[2]));  // Hạng 3
-  formData.append("entry.503297032", getName(ranking[3]));  // Hạng 4
-  formData.append("entry.1646459656", getName(ranking[4])); // Hạng 5
-
-  try {
-    // Gửi song song sang cả 2 nơi
-    await Promise.all([
-      SCORE_DOC.set(firebaseData, { merge: true }),
-      fetch(formURL, { method: "POST", mode: "no-cors", body: formData })
-    ]);
-
-    localStorage.setItem(votedKey, "true");
-    statusText.innerText = "✅ Bình chọn đã được ghi nhận!";
-  } catch (err) {
-    console.error(err);
-    alert("❌ Lỗi kết nối!");
-    submitBtn.classList.remove("success");
-    submitBtn.disabled = false;
-    voteBox.classList.remove("locked");
-  }
+  submitBtn.classList.add("hidden");
+  statusText.innerText = "🔄 Bạn có thể chọn lại";
 };
 
-// ================= 5. ADMIN LOGIC =================
-function openAdmin(){
-  voteBox.classList.add("hidden");
-  submitBtn.classList.add("hidden");
-  adminBox.classList.remove("hidden");
-}
+/* ===== SUBMIT ===== */
+submitBtn.onclick = async () => {
+  if (localStorage.getItem(votedKey)) return;
+  submitBtn.classList.add("success");
+  voteBox.classList.add("locked");
 
-function login(){
-  if(adminPass.value !== ADMIN_PASSWORD) return alert("Sai mật khẩu");
-  adminPanel.classList.remove("hidden");
-  loadResults();
-}
-
-function openVote(){ CONFIG_DOC.set({isOpen:true},{merge:true}); }
-function closeVote(){ CONFIG_DOC.set({isOpen:false},{merge:true}); }
-
-function loadResults(){
-  SCORE_DOC.onSnapshot(doc => {
-    if(!doc.exists) return;
-    const d = doc.data();
-    const list = TALENTS.map(t => ({ name: t.name, v: d[t.id] || 0 })).sort((a,b) => b.v - a.v);
-    const max = Math.max(...list.map(x => x.v), 1);
-    results.innerHTML = "";
-    list.forEach((i, idx) => {
-      results.innerHTML += `
-        <div style="margin-top:10px">
-            <div style="display:flex; justify-content:space-between"><strong>#${idx+1} ${i.name}</strong> <span>${i.v} đ</span></div>
-            <div class="bar-bg"><div class="bar" style="width:${(i.v/max)*100}%"></div></div>
-        </div>`;
-    });
+  const data = {};
+  ranking.forEach((id, i) => {
+    data[id] = firebase.firestore.FieldValue.increment(points[i]);
   });
-}
+
+  // GOOGLE FORM
+  const formURL = "https://docs.google.com/forms/d/e/1FAIpQLSc_yb1JeEIsCCYrICFRcC6wAEiE1sNPgyg5oQnWfV_bRmA8Qg/formResponse";
+  const f = new FormData();
+  const get = id => TALENTS.find(t=>t.id===id).name;
+
+  f.append("entry.1645167770", get(ranking[0]));
+  f.append("entry.16326487", get(ranking[1]));
+  f.append("entry.393003367", get(ranking[2]));
+  f.append("entry.503297032", get(ranking[3]));
+  f.append("entry.1646459656", get(ranking[4]));
+
+  await Promise.all([
+    SCORE_DOC.set(data, { merge:true }),
+    fetch(formURL, { method:"POST", mode:"no-cors", body:f })
+  ]);
+
+  localStorage.setItem(votedKey, "true");
+  statusText.innerText = "✅ Bình chọn đã ghi nhận!";
+  resetBtn.classList.add("hidden");
+};
 </script>
 </body>
 </html>
