@@ -9,48 +9,121 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-body { font-family: system-ui; background: linear-gradient(135deg,#c084fc,#f472b6); margin:0; padding:24px; min-height:100vh; }
+body {
+  font-family: system-ui;
+  background: linear-gradient(135deg,#c084fc,#f472b6);
+  margin:0;
+  padding:24px;
+  min-height:100vh;
+}
 h1 { text-align:center; color:#fff; }
-.grid { max-width:520px; margin:auto; display:grid; gap:12px; }
-.card { background:#fff; border-radius:14px; padding:16px; display:flex; justify-content:space-between; align-items:center; }
-button { padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-weight:bold; }
+
+.grid {
+  max-width:520px;
+  margin:auto;
+  display:grid;
+  gap:12px;
+}
+.card {
+  background:#fff;
+  border-radius:14px;
+  padding:16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+button {
+  padding:10px 14px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
 .pick { background:#8b5cf6; color:#fff; }
 .picked { background:#22c55e; color:#fff; }
+
 .hidden { display:none; }
 .locked { pointer-events:none; opacity:.6; }
-.status { text-align:center; color:#fff; margin-bottom:12px; font-weight:bold; background:rgba(0,0,0,.2); padding:8px; border-radius:50px; }
 
-.submit { width:100%; margin-top:12px; font-size:18px; background:#ec4899; color:#fff; height:50px; position:relative; }
+.status {
+  text-align:center;
+  color:#fff;
+  margin-bottom:12px;
+  font-weight:bold;
+  background:rgba(0,0,0,.2);
+  padding:8px;
+  border-radius:50px;
+}
+
+.submit {
+  width:100%;
+  margin-top:12px;
+  font-size:18px;
+  background:#ec4899;
+  color:#fff;
+  height:50px;
+  position:relative;
+}
 .submit.success { background:#22c55e; }
-.checkmark { position:absolute; inset:0; display:grid; place-items:center; opacity:0; }
+
+.checkmark {
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  opacity:0;
+}
 .submit.success .checkmark { opacity:1; }
+
+/* ===== FADE IN RESTORE ===== */
+.fade-restore {
+  animation: fadeRestore .4s ease forwards;
+}
+
+@keyframes fadeRestore {
+  from {
+    opacity:0;
+    transform:translateY(6px) scale(.98);
+  }
+  to {
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
 </style>
 </head>
 
 <body>
+
 <h1>🎤 Xếp hạng tiết mục yêu thích</h1>
 <div id="status" class="status">Chọn thứ tự yêu thích từ 1 đến 5</div>
 
 <div id="voteBox" class="grid"></div>
 
-<button id="resetBtn" class="submit" style="background:#64748b">♻️ ĐỔI Ý / CHỌN LẠI</button>
+<button id="resetBtn" class="submit" style="background:#64748b">
+  ♻️ ĐỔI Ý / CHỌN LẠI
+</button>
 
 <button id="submitBtn" class="submit hidden">
   <span class="btn-text">GỬI BÌNH CHỌN</span>
   <span class="checkmark">✔</span>
 </button>
 
-<!-- ================= FIREBASE ================= -->
 <script>
+/* ===== FIREBASE ===== */
 firebase.initializeApp({
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT.firebaseapp.com",
   projectId: "YOUR_PROJECT_ID",
 });
 const db = firebase.firestore();
-
-const votedKey = "talent_voted_2026";
 const SCORE_DOC = db.collection("votes").doc("scores");
+
+/* ===== CONSTANT ===== */
+const votedKey   = "talent_voted_2026";
+const rankingKey = "talent_ranking_draft_2026";
 
 const TALENTS = [
   { id:"t1", name:"Sầu Riêng" },
@@ -59,14 +132,16 @@ const TALENTS = [
   { id:"t4", name:"Pressure" },
   { id:"t5", name:"Say Tình" },
 ];
-
 const points = [5,4,3,2,1];
-let ranking = [];
 
-const voteBox = document.getElementById("voteBox");
+/* ===== ELEMENT ===== */
+const voteBox   = document.getElementById("voteBox");
 const submitBtn = document.getElementById("submitBtn");
-const resetBtn = document.getElementById("resetBtn");
+const resetBtn  = document.getElementById("resetBtn");
 const statusText = document.getElementById("status");
+
+let ranking = [];
+let savedRanking = [];
 
 /* ===== INIT ===== */
 if (localStorage.getItem(votedKey)) {
@@ -74,35 +149,62 @@ if (localStorage.getItem(votedKey)) {
   voteBox.classList.add("locked");
   submitBtn.classList.add("hidden");
   resetBtn.classList.add("hidden");
+} else {
+  const saved = localStorage.getItem(rankingKey);
+  if (saved) savedRanking = JSON.parse(saved);
 }
 
-/* ===== TẠO DANH SÁCH ===== */
+/* ===== LIST ===== */
 TALENTS.forEach(t => {
   const card = document.createElement("div");
   card.className = "card";
   card.innerHTML = `<span>${t.name}</span>`;
+
   const btn = document.createElement("button");
   btn.className = "pick";
   btn.innerText = "Chọn";
+
   btn.onclick = () => {
     if (ranking.includes(t.id) || localStorage.getItem(votedKey)) return;
+
     ranking.push(t.id);
+    localStorage.setItem(rankingKey, JSON.stringify(ranking));
+
     btn.innerText = "#" + ranking.length;
     btn.className = "picked";
-    if (ranking.length === TALENTS.length) submitBtn.classList.remove("hidden");
+
+    if (ranking.length === TALENTS.length)
+      submitBtn.classList.remove("hidden");
   };
+
+  /* ===== RESTORE ===== */
+  if (savedRanking.includes(t.id)) {
+    const order = savedRanking.indexOf(t.id) + 1;
+    btn.innerText = "#" + order;
+    btn.className = "picked fade-restore";
+    btn.style.animationDelay = `${order * 70}ms`;
+    ranking.push(t.id);
+  }
+
   card.appendChild(btn);
   voteBox.appendChild(card);
 });
+
+if (ranking.length === TALENTS.length && ranking.length > 0) {
+  submitBtn.classList.remove("hidden");
+}
 
 /* ===== RESET ===== */
 resetBtn.onclick = () => {
   if (localStorage.getItem(votedKey)) return;
   ranking = [];
+  localStorage.removeItem(rankingKey);
+
   document.querySelectorAll(".card button").forEach(b => {
     b.innerText = "Chọn";
     b.className = "pick";
   });
+
   submitBtn.classList.add("hidden");
   statusText.innerText = "🔄 Bạn có thể chọn lại";
 };
@@ -110,6 +212,7 @@ resetBtn.onclick = () => {
 /* ===== SUBMIT ===== */
 submitBtn.onclick = async () => {
   if (localStorage.getItem(votedKey)) return;
+
   submitBtn.classList.add("success");
   voteBox.classList.add("locked");
 
@@ -118,13 +221,12 @@ submitBtn.onclick = async () => {
     data[id] = firebase.firestore.FieldValue.increment(points[i]);
   });
 
-  // GOOGLE FORM
   const formURL = "https://docs.google.com/forms/d/e/1FAIpQLSc_yb1JeEIsCCYrICFRcC6wAEiE1sNPgyg5oQnWfV_bRmA8Qg/formResponse";
   const f = new FormData();
-  const get = id => TALENTS.find(t=>t.id===id).name;
+  const get = id => TALENTS.find(t => t.id === id).name;
 
   f.append("entry.1645167770", get(ranking[0]));
-  f.append("entry.16326487", get(ranking[1]));
+  f.append("entry.16326487",  get(ranking[1]));
   f.append("entry.393003367", get(ranking[2]));
   f.append("entry.503297032", get(ranking[3]));
   f.append("entry.1646459656", get(ranking[4]));
@@ -134,10 +236,14 @@ submitBtn.onclick = async () => {
     fetch(formURL, { method:"POST", mode:"no-cors", body:f })
   ]);
 
-  localStorage.setItem(votedKey, "true");
+  localStorage.setItem(votedKey,"true");
+  localStorage.removeItem(rankingKey);
+
   statusText.innerText = "✅ Bình chọn đã ghi nhận!";
   resetBtn.classList.add("hidden");
 };
 </script>
+
 </body>
 </html>
+``
